@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+*.png
+.DS_Store
+.idea/
+.torch_cache/

@@ -1,0 +1,14 @@
+# Core numerical & image processing
+numpy>=1.26,<2.0
+opencv-python>=4.9,<5.0
+
+# PyTorch (CPU only; for macOS ARM/Intel)
+torch>=2.2,<2.5
+torchvision>=0.17,<0.20
+torchaudio>=2.2,<2.5
+
+# PCA9685 servo/ESC control
+adafruit-circuitpython-pca9685>=3.4,<4.0
+
+# Optional: for I2C/SPI on Raspberry Pi
+adafruit-blinka>=8.0,<9.0
