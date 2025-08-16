@@ -1,5 +1,6 @@
 import cv2
 import time
+import numpy as np
 
 from MiDaS import MiDaS
 from DepthNavigator import  decide_action, visualize_once
