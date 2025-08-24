@@ -1,6 +1,7 @@
 import cv2
 import time
 import numpy as np
+import os
 
 from MiDaS import MiDaS
 from DepthNavigator import  decide_action, visualize_once
@@ -24,13 +25,44 @@ def main():
     picam2.configure(config)
     picam2.start()
 
+    os.makedirs("captures", exist_ok=True)
+
+    # Setup OpenCV display window if possible
+    display_enabled = bool(os.environ.get("DISPLAY"))
+    if display_enabled:
+        try:
+            cv2.namedWindow("Camera", cv2.WINDOW_AUTOSIZE)
+            print("Preview  : OpenCV window enabled (VNC/X11)")
+        except Exception as e:
+            print(f"Preview  : disabled ({e})")
+            display_enabled = False
+    else:
+        print("Preview  : disabled (no DISPLAY)")
+
     # inference
-    interval_s = 2.0
+    interval_s = 0.5
     print("Started. Press Ctrl+C to stop.")
     try:
         while True:
             # Picamera2 直接回傳 RGB888 (H,W,3), uint8
             rgb = picam2.capture_array()
+            bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+
+            # 顯示到 VNC/OpenCV 視窗
+            if display_enabled:
+                try:
+                    cv2.imshow("Camera", bgr)
+                    cv2.waitKey(1)
+                except Exception as e:
+                    print(f"[Preview error] {e}")
+                    display_enabled = False
+
+            # 每 0.5s 存一張圖
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            out_path = os.path.join("captures", f"{ts}.jpg")
+            cv2.imwrite(out_path, bgr)
+            print(f"Saved {out_path}")
+
             rgb = _shrink_to_max_side(rgb, max_side=512)
 
             depth = midas.predict_depth(rgb)
@@ -45,6 +77,11 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        try:
+            if 'display_enabled' in locals() and display_enabled:
+                cv2.destroyAllWindows()
+        except Exception:
+            pass
         picam2.stop()
 
     # img_rgb = midas.preprocess_img(img="input.jpg")

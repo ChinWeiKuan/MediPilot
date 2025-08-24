@@ -18,9 +18,9 @@ import time
 
 # === Calibrations / defaults (can be overridden by CLI) ===
 DEFAULT_SPEED_MPS = 0.325      # 直線速度 (m/s)
-DEFAULT_TRIM = -0.15           # 你的實測：f 1 -0.15 可走直
-TURN_90_LEFT_S = 0.72          # 左轉 90° 實測秒數
-TURN_90_RIGHT_S = 0.72         # 右轉 90° 實測秒數（可獨立校正）
+DEFAULT_TRIM = 0         # 你的實測：f 1 -0.15 可走直
+TURN_90_LEFT_S = 0.65          # 左轉 90° 實測秒數
+TURN_90_RIGHT_S = 0.65         # 右轉 90° 實測秒數（可獨立校正）
 SLACK_S = 0.05                 # 步驟間的小間隔，避免驅動黏連
 
 # 匯入你的馬達控制原語
