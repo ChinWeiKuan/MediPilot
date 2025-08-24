@@ -41,27 +41,23 @@ def run_actions(actions, speed_mps=DEFAULT_SPEED_MPS, trim=DEFAULT_TRIM,
         if atype == "move":
             meters = float(act.get("meters", 0.0))
             secs = meters / float(speed_mps) if speed_mps > 0 else 0.0
-            if dry_run:
-                print(f"[{i:02d}] MOVE {meters:.3f} m  -> {secs:.2f} s (trim={trim:+.2f})")
-            else:
+            print(f"[{i:02d}] MOVE {meters:.3f} m  -> {secs:.2f} s (speed={speed_mps:.3f} m/s, trim={trim:+.2f})")
+            if not dry_run:
                 forward(secs, trim)
                 time.sleep(SLACK_S)
         elif atype == "turn":
             d = act.get("dir", "").lower()
             if d == "left":
-                if dry_run:
-                    print(f"[{i:02d}] TURN LEFT 90° -> {t90:.2f} s")
-                else:
+                print(f"[{i:02d}] TURN LEFT 90° -> {t90:.2f} s")
+                if not dry_run:
                     turnLeft(t90)
             elif d == "right":
-                if dry_run:
-                    print(f"[{i:02d}] TURN RIGHT 90° -> {t90:.2f} s")
-                else:
+                print(f"[{i:02d}] TURN RIGHT 90° -> {t90:.2f} s")
+                if not dry_run:
                     turnRight(t90)
             elif d in ("u-turn", "uturn", "u"):
-                if dry_run:
-                    print(f"[{i:02d}] U-TURN 180° -> {2*t90:.2f} s")
-                else:
+                print(f"[{i:02d}] U-TURN 180° -> {2*t90:.2f} s")
+                if not dry_run:
                     # 連續兩次 90° 原地轉向即可
                     turnRight(t90)
                     time.sleep(SLACK_S)
@@ -72,6 +68,7 @@ def run_actions(actions, speed_mps=DEFAULT_SPEED_MPS, trim=DEFAULT_TRIM,
                 time.sleep(SLACK_S)
         else:
             print(f"[{i:02d}] [WARN] Unknown action type: {atype!r}, skipping")
+    print("=== Navigation finished ===")
 
 
 def main():
@@ -82,6 +79,14 @@ def main():
     ap.add_argument("--t90",   type=float, default=TURN_90_S, help="Seconds per 90-degree in-place turn")
     ap.add_argument("--dry",   action="store_true", help="Print what would run without moving motors")
     args = ap.parse_args()
+
+    print("=== Navigation run start ===")
+    print(f"Plan file : {args.plan}")
+    print(f"Speed     : {args.speed:.3f} m/s")
+    print(f"Trim      : {args.trim:+.2f}")
+    print(f"T90       : {args.t90:.2f} s per 90° turn")
+    print(f"Dry-run   : {args.dry}")
+    print("============================")
 
     with open(args.plan, "r", encoding="utf-8") as f:
         obj = json.load(f)
