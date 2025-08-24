@@ -7,12 +7,12 @@ Motor_R2_Pin = 18
 Motor_L1_Pin = 11
 Motor_L2_Pin = 13
 DEFAULT_STEP_S = 1.0  # default movement duration (seconds)
-DEFAULT_STEP_S_turn = 0.8  # default turn duration (seconds)
+DEFAULT_STEP_S_turn = 0.72  # default turn duration (seconds)
 
 # Trim controls left/right bias for straight driving.
 # Positive TRIM means the robot tends to drift RIGHT, so we will slightly "weaken" the RIGHT wheel.
 # Range recommendation: -0.3 ~ +0.3
-TRIM_DEFAULT = 0.0
+TRIM_DEFAULT = -0.15
 _SLICE_S = 0.05  # time-slicing for software trim (sec)
 
 
