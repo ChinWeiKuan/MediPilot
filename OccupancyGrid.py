@@ -17,9 +17,8 @@ UTURN_COST = 1.2
 
 # ---- Safety preferences (keep to the center of corridors) ----
 # 1) Inflate obstacles by this radius so planner won't skim furniture edges
-INFLATION_RADIUS_M = 0.0   # 不膨脹
-# 2) Add a "repulsion" cost that grows near obstacles via distance transform
-DISTFIELD_WEIGHT   = 0.0   # 不施加靠中間的軟代價（純粹最少轉彎傾向）
+INFLATION_RADIUS_M = 0.05  # 輕微膨脹（5cm），避免貼邊；若要完全關閉請設 0.0
+DISTFIELD_WEIGHT   = 0.8   # >0 會啟用「靠中間」的軟代價（距障越近代價越高）；0=關閉
 DISTFIELD_EPS      = 1e-3      # avoid divide-by-zero in cost
 
 # 讀取點雲
@@ -99,10 +98,65 @@ if r_cells > 0:
 free_u8 = (grid != 0).astype(np.uint8)
 dist_pix = cv2.distanceTransform(free_u8, cv2.DIST_L2, 3)  # in cells
 dist_m   = dist_pix * float(resolution)
-# Higher cost near obstacles; ~0 cost in the middle of wide corridors
-cell_cost = DISTFIELD_WEIGHT * (1.0 / (dist_m + DISTFIELD_EPS))
-# Obstacles won't be traversed anyway, but keep their cost very high for completeness
+
+# Raw repulsion ~ 1 / distance; larger when close to obstacles
+repulsion_raw = 1.0 / (dist_m + DISTFIELD_EPS)
+
+# 95th-percentile normalization so that typical added cost is ~0..1
+# Compute percentile only on free cells to avoid obstacle placeholders
+mask_free = (grid != 0)
+if np.any(mask_free):
+    q95 = np.percentile(repulsion_raw[mask_free], 95)
+    if q95 <= 0:
+        q95 = 1.0
+else:
+    q95 = 1.0
+
+# (Optional debug) print q95 for tuning
+print(f"[costfield] q95 (1/(dist+eps)) = {q95:.4f}, weight = {DISTFIELD_WEIGHT}")
+
+repulsion_norm = repulsion_raw / q95  # scale so that 95% of free cells are <= 1
+# (Optional) clip extreme spikes to avoid dominating turn/step costs
+repulsion_norm = np.clip(repulsion_norm, 0.0, 3.0)
+
+# Final per-cell added cost
+cell_cost = DISTFIELD_WEIGHT * repulsion_norm
+
+# Obstacles set to very high cost for completeness (they're blocked anyway)
 cell_cost[grid == 0] = 1e6
+
+# ---- Helper: snap a (ix,iy) to nearest free cell (prefer farther from obstacle) ----
+def snap_to_nearest_free(ix, iy, grid, dist_pref=None, max_radius_cells=100):
+    """
+    If (ix,iy) lies in obstacle, search outward in square rings up to max_radius_cells.
+    Prefer the candidate with the largest dist_pref (e.g., distance to obstacle).
+    Returns (nx, ny) or None if none found.
+    """
+    h, w = grid.shape
+    if 0 <= ix < w and 0 <= iy < h and grid[iy, ix] != 0:
+        return ix, iy
+    best = None
+    best_score = -1.0
+    for r in range(1, int(max_radius_cells) + 1):
+        x0, x1 = max(ix - r, 0), min(ix + r, w - 1)
+        y0, y1 = max(iy - r, 0), min(iy + r, h - 1)
+        # top & bottom edges
+        for x in range(x0, x1 + 1):
+            for y in (y0, y1):
+                if 0 <= y < h and grid[y, x] != 0:
+                    score = float(dist_pref[y, x]) if dist_pref is not None else 0.0
+                    if score > best_score:
+                        best = (x, y); best_score = score
+        # left & right edges
+        for y in range(y0 + 1, y1):
+            for x in (x0, x1):
+                if 0 <= x < w and grid[y, x] != 0:
+                    score = float(dist_pref[y, x]) if dist_pref is not None else 0.0
+                    if score > best_score:
+                        best = (x, y); best_score = score
+        if best is not None:
+            return best
+    return None
 
 # 存成圖
 plt.imshow(grid, cmap="gray")
@@ -311,10 +365,20 @@ plt.xlabel("x (m)"); plt.ylabel("y (m)")
 plt.savefig("map_points.png", dpi=300, bbox_inches='tight')
 
 
+# 若起點/終點剛好落在障礙上，嘗試就近「吸附」到最近可走格（偏好離障礙遠的點）
+max_r = int(np.ceil(0.5 / resolution))  # 最多搜尋 ~0.5m
 if grid[start_ij[1], start_ij[0]] == 0:
-    raise ValueError(f"Start {start_ij} 落在障礙上，請調整座標")
-if grid[goal_ij[1],  goal_ij[0]]  == 0:
-    raise ValueError(f"Goal  {goal_ij} 落在障礙上，請調整座標")
+    snapped = snap_to_nearest_free(start_ij[0], start_ij[1], grid, dist_pref=dist_pix, max_radius_cells=max_r)
+    if snapped is None:
+        raise ValueError(f"Start {start_ij} 落在障礙上且附近無可走區，請調整座標")
+    print(f"[snap] Start {start_ij} → {snapped} (meters(map): {((snapped[0]+0.5)*resolution, (snapped[1]+0.5)*resolution)})")
+    start_ij = snapped
+if grid[goal_ij[1], goal_ij[0]] == 0:
+    snapped = snap_to_nearest_free(goal_ij[0], goal_ij[1], grid, dist_pref=dist_pix, max_radius_cells=max_r)
+    if snapped is None:
+        raise ValueError(f"Goal  {goal_ij} 落在障礙上且附近無可走區，請調整座標")
+    print(f"[snap] Goal  {goal_ij} → {snapped} (meters(map): {((snapped[0]+0.5)*resolution, (snapped[1]+0.5)*resolution)})")
+    goal_ij = snapped
 
 # 規劃
 path_cells = astar(grid, start_ij, goal_ij, allow_diag=ALLOW_DIAG, turn_cost=TURN_COST, cell_cost=cell_cost)
