@@ -12,7 +12,8 @@ def _shrink_to_max_side(rgb: np.ndarray, max_side: int = 512) -> np.ndarray:
     if max(h, w) <= max_side:
         return rgb
     scale = max_side / max(h, w)
-    return cv2.resize(rgb, (int(w*scale), int(h*scale)), interpolation=cv2.INTER_AREA)
+    return cv2.resize(rgb, (int(w*scale), int(h*scale)), inter
+    polation=cv2.INTER_AREA)
 
 def main():
     # initialize MIDaS
@@ -20,7 +21,6 @@ def main():
 
     # initialize Camera
     picam2 = Picamera2()
-    # 640x480 + RGB888 已足夠；越小越省算力
     config = picam2.create_video_configuration(main={"size": (640, 480), "format": "RGB888"})
     picam2.configure(config)
     picam2.start()
